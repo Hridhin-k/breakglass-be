@@ -1,0 +1,142 @@
+# "org" ensures this Service is used with the correct Serverless Framework Access Key.
+org: explaineddigital
+# "app" enables Serverless Framework Dashboard features and sharing them with other Services.
+app: breakglass-be
+# "service" is the name of this project. This will also be added to your AWS resource names.
+service: breakglass-be
+useDotenv: true
+provider:
+  name: aws
+  runtime: nodejs20.x
+  environment:
+    DB_HOST: ${env:DB_HOST}
+    DB_PORT: ${env:DB_PORT}
+    DB_USER: ${env:DB_USER}
+    DB_PASSWORD: ${env:DB_PASSWORD}
+    DB_DATABASE: ${env:DB_DATABASE}
+    JWT_SECRET: ${env:JWT_SECRET}
+    # AWS_ACCESS_KEY_ID: ${env:AWS_ACCESS_KEY_ID}
+    # AWS_SECRET_ACCESS_KEY: ${env:AWS_SECRET_ACCESS_KEY}
+    # AWS_REGION: ${env:AWS_REGION}
+    # AWS_S3_BUCKET_NAME: ${env:AWS_S3_BUCKET_NAME}
+
+plugins:
+  - serverless-offline
+functions:
+  registerUser:
+    handler: src/handlers/authHandler.registerUser
+    events:
+      - http:
+          path: register
+          method: post
+          cors:
+            origins:
+              - "*"
+  loginUser:
+    handler: src/handlers/authHandler.loginUser
+    events:
+      - http:
+          path: login
+          method: post
+          cors:
+            origins:
+              - "*"
+  RefreshToken:
+    handler: src/handlers/authHandler.refreshToken
+    events:
+      - http:
+          path: refresh
+          method: post
+          cors:
+            origins:
+              - "*"
+  CreateQuestionnaire:
+    handler: src/handlers/questionnaireHandler.addQuestionsHandler
+    events:
+      - http:
+          path: questionnaires
+          method: post
+          cors:
+            origins:
+              - "*"
+  GetQuestionnaires:
+    handler: src/handlers/questionnaireHandler.getQuestionsHandler
+    events:
+      - http:
+          path: questionnaires
+          method: get
+          cors:
+            origins:
+              - "*"
+  UpdateQuestionnaires:
+    handler: src/handlers/questionnaireHandler.updateQuestionsHandler
+    events:
+      - http:
+          path: questionnaires
+          method: put
+          cors:
+            origins:
+              - "*"
+  DeleteQuestionnaires:
+    handler: src/handlers/questionnaireHandler.deleteQuestionsHandler
+    events:
+      - http:
+          path: questionnaires
+          method: delete
+          cors:
+            origins:
+              - "*"
+  SubmitIncident:
+    handler: src/handlers/incidentSubmissionHandler.submitIncidentHandler
+    events:
+      - http:
+          path: incident/submit
+          method: post
+          cors:
+            origins:
+              - "*"
+  GetUserSubmissions:
+    handler: src/handlers/incidentSubmissionHandler.getUserSubmissionsHandler
+    events:
+      - http:
+          path: incident/submissions
+          method: get
+          cors:
+            origins:
+              - "*"
+  UpdateIncident:
+    handler: src/handlers/incidentSubmissionHandler.updateIncidentHandler
+    events:
+      - http:
+          path: incident/update
+          method: post
+          cors:
+            origins:
+              - "*"
+  GetUserData:
+    handler: src/handlers/userHandler.getUserHandler
+    events:
+      - http:
+          path: users
+          method: get
+          cors:
+            origins:
+              - "*"
+  UpdateUserData:
+    handler: src/handlers/userHandler.updateUserHandler
+    events:
+      - http:
+          path: users
+          method: put
+          cors:
+            origins:
+              - "*"
+  UploadMedia:
+    handler: src/handlers/uploadHandler.uploadMediaHandler
+    events:
+      - http:
+          path: media/upload
+          method: post
+          cors:
+            origins:
+              - "*"

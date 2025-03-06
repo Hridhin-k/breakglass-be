@@ -1,0 +1,48 @@
+{
+    "name": "breakglass-backend",
+    "version": "1.0.0",
+    "description": "<!-- title: 'AWS Simple HTTP Endpoint example in NodeJS' description: 'This template demonstrates how to make a simple HTTP API with Node.js running on AWS Lambda and API Gateway using the Serverless Framework.' layout: Doc framework: v4 platform: AWS language: nodeJS authorLink: 'https://github.com/serverless' authorName: 'Serverless, Inc.' authorAvatar: 'https://avatars1.githubusercontent.com/u/13742415?s=200&v=4' -->",
+    "main": "handler.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "@aws-sdk/client-s3": "^3.758.0",
+        "bcrypt": "^5.1.1",
+        "bcryptjs": "^2.4.3",
+        "busboy": "^1.6.0",
+        "class-transformer": "^0.5.1",
+        "class-validator": "^0.14.1",
+        "dotenv": "^16.4.7",
+        "jsonwebtoken": "^9.0.2",
+        "mime-types": "^2.1.35",
+        "multer": "^1.4.5-lts.1",
+        "pg": "^8.13.1",
+        "reflect-metadata": "^0.2.2",
+        "serverless": "^4.4.18",
+        "serverless-http": "^3.2.0",
+        "typeorm": "^0.3.20",
+        "uuid": "^11.1.0"
+    },
+    "devDependencies": {
+        "@types/aws-lambda": "^8.10.147",
+        "@types/aws-sdk": "^2.7.4",
+        "@types/bcrypt": "^5.0.2",
+        "@types/bcryptjs": "^2.4.6",
+        "@types/busboy": "^1.5.4",
+        "@types/express": "^5.0.0",
+        "@types/jsonwebtoken": "^9.0.7",
+        "@types/mime-types": "^2.1.4",
+        "@types/multer": "^1.4.12",
+        "@types/node": "^22.10.7",
+        "@types/uuid": "^10.0.0",
+        "@typescript-eslint/eslint-plugin": "^8.19.1",
+        "@typescript-eslint/parser": "^8.19.1",
+        "eslint": "^9.18.0",
+        "serverless-offline": "^14.4.0",
+        "typescript": "^5.7.3"
+    }
+}
