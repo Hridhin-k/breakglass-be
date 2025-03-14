@@ -5,7 +5,7 @@ import { IncidentMedia } from "../entities/IncidentMedia";
 import { IncidentQuestion } from "../entities/IncidentQuestion";
 import { IncidentQuestionOption } from "../entities/IncidentQuestionOption";
 import { IncidentSubmission } from "../entities/IncidentSubmission";
-import { User } from "../entities/User";
+import { Users } from "../entities/Users";
 
 // Create a new DataSource instance to configure the connection
 export const connectDB = async (): Promise<DataSource> => {
@@ -18,7 +18,7 @@ export const connectDB = async (): Promise<DataSource> => {
       password: process.env.DB_PASSWORD,
       database: process.env.DB_DATABASE,
       entities: [
-        User,
+        Users,
         IncidentQuestion,
         IncidentQuestionOption,
         IncidentAnswer,

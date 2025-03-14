@@ -2,6 +2,12 @@ import { In } from "typeorm";
 import { connectDB } from "../utils/database";
 import { IncidentQuestion } from "../entities/IncidentQuestion";
 import { IncidentQuestionOption } from "../entities/IncidentQuestionOption";
+import { v4 as uuidv4 } from "uuid";
+import AWS from "aws-sdk";
+import dotenv from "dotenv";
+
+dotenv.config();
+const s3 = new AWS.S3();
 export class QuestionService {
   async addQuestions(
     questions: {
@@ -57,22 +63,50 @@ export class QuestionService {
     }
   }
 
-  async getQuestions() {
+  async getQuestions(requestedUserId?: number) {
+    // userId is now optional
     const dataSource = await connectDB();
     const questionRepository = dataSource.getRepository(IncidentQuestion);
+
     try {
       const questions = await questionRepository
         .createQueryBuilder("question")
         .leftJoinAndSelect("question.options", "option")
-        .orderBy("question.order", "ASC") // Order questions by the 'order' field in ascending order
-        .addOrderBy("option.createdAt", "ASC") // Order options by createdAt ASC
+        .orderBy("question.order", "ASC")
+        .addOrderBy("option.createdAt", "ASC")
         .getMany();
+
+      let questionsWithPresignedUrls = questions; // Default to questions without URLs
+
+      if (requestedUserId) {
+        // Generate URLs only if userId is provided
+        questionsWithPresignedUrls = await Promise.all(
+          questions.map(async (question) => {
+            if (question.questionType === "file") {
+              const presignedUrls = [];
+              for (let i = 0; i < 10; i++) {
+                const key = `${uuidv4()}`;
+                const params = {
+                  Bucket: process.env.UPLOAD_BUCKET_NAME,
+                  Key: key,
+                  Expires: 60 * 30, // 5 minutes
+                };
+                const url = await s3.getSignedUrlPromise("putObject", params);
+
+                presignedUrls.push({ url, key });
+              }
+              return { ...question, presignedUrls };
+            }
+            return question;
+          })
+        );
+      }
 
       return {
         statusCode: 200,
         body: {
           success: true,
-          data: questions,
+          data: questionsWithPresignedUrls,
         },
       };
     } catch (error: any) {

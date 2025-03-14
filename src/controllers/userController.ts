@@ -7,9 +7,12 @@ export class UserController {
     this.userService = new UserService();
   }
 
-  async getUserData(requestedUserId?: number) {
+  async getUserData(requestedUserId?: number, pendingUsers?: string) {
     try {
-      const result = await this.userService.getUserData(requestedUserId);
+      const result = await this.userService.getUserData(
+        requestedUserId,
+        pendingUsers
+      );
       return {
         statusCode: 200,
         headers: {

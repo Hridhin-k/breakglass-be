@@ -3,7 +3,6 @@ import { connectDB } from "../utils/database";
 import { IncidentSubmission } from "../entities/IncidentSubmission";
 import { IncidentAnswer } from "../entities/IncidentAnswer";
 import { IncidentQuestion } from "../entities/IncidentQuestion";
-import { User } from "../entities/User";
 import { log } from "node:console";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { v4 as uuidv4 } from "uuid";
@@ -11,6 +10,7 @@ import * as mime from "mime-types";
 import { IncidentMedia } from "../entities/IncidentMedia";
 import AWS from "aws-sdk";
 import dotenv from "dotenv";
+import { Users } from "../entities/Users";
 
 dotenv.config(); // Load environment variables
 const s3 = new AWS.S3();
@@ -21,33 +21,163 @@ interface FileData {
   description?: string;
 }
 export class IncidentSubmissionService {
-  async uploadFileToS3(
-    fileBuffer: Buffer,
-    fileName: string,
-    contentType: string
-  ): Promise<string> {
-    const bucketName = process.env.AWS_S3_BUCKET_NAME;
+  // async uploadFileToS3(
+  //   fileBuffer: Buffer,
+  //   fileName: string,
+  //   contentType: string
+  // ): Promise<string> {
+  //   const bucketName = process.env.UPLOAD_BUCKET_NAME;
 
-    if (!bucketName) {
-      throw new Error(
-        "AWS_S3_BUCKET_NAME is not defined in environment variables."
-      );
-    }
+  //   if (!bucketName) {
+  //     throw new Error(
+  //       "UPLOAD_BUCKET_NAME is not defined in environment variables."
+  //     );
+  //   }
 
-    const key = `${uuidv4()}-${fileName}`;
-    const uploadParams = {
-      Bucket: bucketName,
-      Key: key,
-      Body: fileBuffer,
-      ContentType: contentType,
-    };
+  //   const key = `${uuidv4()}-${fileName}`;
+  //   const uploadParams = {
+  //     Bucket: bucketName,
+  //     Key: key,
+  //     Body: fileBuffer,
+  //     ContentType: contentType,
+  //   };
 
-    await s3.upload(uploadParams).promise();
-    return `https://${bucketName}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
-  }
+  //   await s3.upload(uploadParams).promise();
+  //   return `https://${bucketName}.s3.${process.env.UPLOAD_REGION}.amazonaws.com/${key}`;
+  // }
+  // async submitIncident(
+  //   userId: number,
+  //   answers: { questionId: number; answer: string | any | any[] }[]
+  // ) {
+  //   const dataSource = await connectDB();
+  //   const incidentRepository = dataSource.getRepository(IncidentSubmission);
+  //   const answerRepository = dataSource.getRepository(IncidentAnswer);
+  //   const questionRepository = dataSource.getRepository(IncidentQuestion);
+  //   const mediaRepository = dataSource.getRepository(IncidentMedia);
+
+  //   try {
+  //     // Step 1: Create a new incident submission
+  //     const submission = incidentRepository.create({
+  //       user: { id: userId },
+  //       incidentNumber: Date.now(),
+  //       version: 1,
+  //     });
+
+  //     await incidentRepository.save(submission);
+
+  //     // Step 2: Prepare answer entities
+  //     const answerEntities = await Promise.all(
+  //       answers.map(async ({ questionId, answer }) => {
+  //         const question = await questionRepository.findOne({
+  //           where: { id: questionId },
+  //         });
+
+  //         if (!question) {
+  //           throw new Error(`Question with ID ${questionId} not found.`);
+  //         }
+
+  //         const answerEntity = answerRepository.create({
+  //           incidentSubmission: submission,
+  //           question,
+  //           type: question.questionType,
+  //           version: 1,
+  //         });
+  //         // Store answer based on question type
+  //         switch (question.questionType) {
+  //           case "single_choice":
+  //             answerEntity.singleChoiceAnswer = answer as string;
+  //             break;
+  //           case "multiple_choice":
+  //             answerEntity.multipleChoiceAnswer = Array.isArray(answer)
+  //               ? answer
+  //               : [answer as string];
+  //             break;
+  //           case "date":
+  //             answerEntity.dateAnswer = new Date(answer as string);
+  //             break;
+  //           case "plain_text":
+  //             answerEntity.textAnswer = answer as string;
+  //             break;
+  //           case "map":
+  //             if (typeof answer === "string") {
+  //               try {
+  //                 answerEntity.mapAnswer = JSON.parse(answer);
+  //               } catch (error) {
+  //                 throw new Error(
+  //                   `Invalid map data format for question ${questionId}`
+  //                 );
+  //               }
+  //             } else {
+  //               answerEntity.mapAnswer = answer as {
+  //                 name: string;
+  //                 latitude: number;
+  //                 longitude: number;
+  //               };
+  //             }
+  //             break;
+  //           case "file":
+  //             if (Array.isArray(answer)) {
+  //               await Promise.all(
+  //                 answer.map(
+  //                   async (fileData: {
+  //                     fileName: string;
+  //                     file: string;
+  //                     contentType: string;
+  //                     description?: string;
+  //                   }) => {
+  //                     const fileBuffer = Buffer.from(fileData.file, "base64");
+  //                     const fileUrl = await this.uploadFileToS3(
+  //                       fileBuffer,
+  //                       fileData.fileName,
+  //                       fileData.contentType
+  //                     );
+
+  //                     const media = mediaRepository.create({
+  //                       incidentSubmission: submission,
+  //                       question,
+  //                       url: fileUrl,
+  //                       mimeType: fileData.contentType,
+  //                       version: 1,
+  //                       description: fileData.description,
+  //                     });
+  //                     await mediaRepository.save(media);
+  //                   }
+  //                 )
+  //               );
+  //             }
+  //             break;
+  //           default:
+  //             throw new Error(
+  //               `Invalid question type: ${question.questionType}`
+  //             );
+  //         }
+
+  //         return answerEntity;
+  //       })
+  //     );
+
+  //     // Step 3: Save answers to the database
+  //     await answerRepository.save(answerEntities);
+
+  //     return { message: "Incident submitted successfully", submission };
+  //   } catch (error) {
+  //     console.error(
+  //       "Error in IncidentSubmissionService (submitIncident):",
+  //       error
+  //     );
+  //     throw error;
+  //   } finally {
+  //     await dataSource.destroy();
+  //   }
+  // }
+
   async submitIncident(
     userId: number,
-    answers: { questionId: number; answer: string | any | any[] }[]
+    answers: {
+      questionId: number;
+      answer: string | any | any[];
+      uploadedFiles?: { key: string; mimeType: string }[];
+    }[]
   ) {
     const dataSource = await connectDB();
     const incidentRepository = dataSource.getRepository(IncidentSubmission);
@@ -55,118 +185,114 @@ export class IncidentSubmissionService {
     const questionRepository = dataSource.getRepository(IncidentQuestion);
     const mediaRepository = dataSource.getRepository(IncidentMedia);
 
+    const queryRunner = dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
     try {
-      // Step 1: Create a new incident submission
       const submission = incidentRepository.create({
         user: { id: userId },
         incidentNumber: Date.now(),
         version: 1,
       });
 
-      await incidentRepository.save(submission);
+      const savedSubmission = await queryRunner.manager.save(submission);
 
-      // Step 2: Prepare answer entities
-      const answerEntities = await Promise.all(
-        answers.map(async ({ questionId, answer }) => {
-          const question = await questionRepository.findOne({
-            where: { id: questionId },
-          });
+      for (const { questionId, answer, uploadedFiles } of answers) {
+        const question = await questionRepository.findOne({
+          where: { id: questionId },
+        });
 
-          if (!question) {
-            throw new Error(`Question with ID ${questionId} not found.`);
-          }
+        if (!question) {
+          throw new Error(`Question with ID ${questionId} not found.`);
+        }
 
-          const answerEntity = answerRepository.create({
-            incidentSubmission: submission,
-            question,
-            type: question.questionType,
-            version: 1,
-          });
-          // Store answer based on question type
-          switch (question.questionType) {
-            case "single_choice":
-              answerEntity.singleChoiceAnswer = answer as string;
-              break;
-            case "multiple_choice":
-              answerEntity.multipleChoiceAnswer = Array.isArray(answer)
-                ? answer
-                : [answer as string];
-              break;
-            case "date":
-              answerEntity.dateAnswer = new Date(answer as string);
-              break;
-            case "plain_text":
-              answerEntity.textAnswer = answer as string;
-              break;
-            case "map":
-              if (typeof answer === "string") {
-                try {
-                  answerEntity.mapAnswer = JSON.parse(answer);
-                } catch (error) {
-                  throw new Error(
-                    `Invalid map data format for question ${questionId}`
-                  );
-                }
-              } else {
-                answerEntity.mapAnswer = answer as {
-                  name: string;
-                  latitude: number;
-                  longitude: number;
-                };
-              }
-              break;
-            case "file":
-              if (Array.isArray(answer)) {
-                await Promise.all(
-                  answer.map(
-                    async (fileData: {
-                      fileName: string;
-                      file: string;
-                      contentType: string;
-                      description?: string;
-                    }) => {
-                      const fileBuffer = Buffer.from(fileData.file, "base64");
-                      const fileUrl = await this.uploadFileToS3(
-                        fileBuffer,
-                        fileData.fileName,
-                        fileData.contentType
-                      );
+        const answerEntity = answerRepository.create({
+          incidentSubmission: savedSubmission,
+          question,
+          type: question.questionType,
+          version: 1,
+        });
 
-                      const media = mediaRepository.create({
-                        incidentSubmission: submission,
-                        question,
-                        url: fileUrl,
-                        mimeType: fileData.contentType,
-                        version: 1,
-                        description: fileData.description,
-                      });
-                      await mediaRepository.save(media);
-                    }
-                  )
+        switch (question.questionType) {
+          case "single_choice":
+            answerEntity.singleChoiceAnswer = answer as string;
+            await queryRunner.manager.save(answerEntity);
+            break;
+          case "multiple_choice":
+            answerEntity.multipleChoiceAnswer = Array.isArray(answer)
+              ? answer
+              : [answer as string];
+            await queryRunner.manager.save(answerEntity);
+            break;
+          case "date":
+            answerEntity.dateAnswer = new Date(answer as string);
+            await queryRunner.manager.save(answerEntity);
+            break;
+          case "plain_text":
+            answerEntity.textAnswer = answer as string;
+            await queryRunner.manager.save(answerEntity);
+            break;
+          case "map":
+            if (typeof answer === "string") {
+              try {
+                answerEntity.mapAnswer = JSON.parse(answer);
+              } catch (error) {
+                throw new Error(
+                  `Invalid map data format for question ${questionId}`
                 );
               }
-              break;
-            default:
-              throw new Error(
-                `Invalid question type: ${question.questionType}`
-              );
-          }
+            } else {
+              answerEntity.mapAnswer = answer as {
+                name: string;
+                latitude: number;
+                longitude: number;
+              };
+            }
+            await queryRunner.manager.save(answerEntity);
+            break;
+          case "file":
+            // Handle file uploads
+            if (uploadedFiles && uploadedFiles.length > 0) {
+              for (const file of uploadedFiles) {
+                const bucketName = process.env.UPLOAD_BUCKET_NAME; // Get bucket name from env
+                const region = process.env.UPLOAD_REGION || "us-east-1"; // Get region from env, default to us-east-1
+                const url = `https://${bucketName}.s3${
+                  region === "us-east-1" ? "" : `.${region}`
+                }.amazonaws.com/${file.key}`;
+                console.log(url);
 
-          return answerEntity;
-        })
-      );
+                const media = mediaRepository.create({
+                  incidentSubmission: savedSubmission,
+                  question,
+                  url: url, // store the key
+                  mimeType: file.mimeType,
+                  version: 1,
+                });
+                await queryRunner.manager.save(media);
+              }
+            }
+            break;
+          default:
+            throw new Error(`Invalid question type: ${question.questionType}`);
+        }
+      }
 
-      // Step 3: Save answers to the database
-      await answerRepository.save(answerEntities);
+      await queryRunner.commitTransaction();
 
-      return { message: "Incident submitted successfully", submission };
+      return {
+        message: "Incident submitted successfully",
+        submission: savedSubmission,
+      };
     } catch (error) {
+      await queryRunner.rollbackTransaction();
       console.error(
         "Error in IncidentSubmissionService (submitIncident):",
         error
       );
       throw error;
     } finally {
+      await queryRunner.release();
       await dataSource.destroy();
     }
   }
@@ -179,12 +305,27 @@ export class IncidentSubmissionService {
   ) {
     const dataSource = await connectDB();
     const incidentRepository = dataSource.getRepository(IncidentSubmission);
-    const userRepository = dataSource.getRepository(User);
+    const userRepository = dataSource.getRepository(Users);
     const answerRepository = dataSource.getRepository(IncidentAnswer);
     try {
       const user = await userRepository.findOne({
         where: { id: userId },
-        select: ["id", "username", "email"],
+        select: [
+          "id",
+          "username",
+          "email",
+          "firstName",
+          "lastName",
+          "mobileNumber",
+          "address",
+          "city",
+          "state",
+          "zipCode",
+          "institution",
+          "category",
+          "classYear",
+          "majoringIn",
+        ],
       });
 
       if (!user) {
@@ -249,12 +390,27 @@ export class IncidentSubmissionService {
   ) {
     const dataSource = await connectDB();
     const incidentRepository = dataSource.getRepository(IncidentSubmission);
-    const userRepository = dataSource.getRepository(User);
+    const userRepository = dataSource.getRepository(Users);
     const answerRepository = dataSource.getRepository(IncidentAnswer);
     try {
       const user = await userRepository.findOne({
         where: { id: userId },
-        select: ["id", "username", "email"],
+        select: [
+          "id",
+          "username",
+          "email",
+          "firstName",
+          "lastName",
+          "mobileNumber",
+          "address",
+          "city",
+          "state",
+          "zipCode",
+          "institution",
+          "category",
+          "classYear",
+          "majoringIn",
+        ],
       });
 
       if (!user) {
@@ -317,7 +473,7 @@ export class IncidentSubmissionService {
   async getAllSubmissions(requestedVersion?: number) {
     const dataSource = await connectDB();
     const incidentRepository = dataSource.getRepository(IncidentSubmission);
-    const userRepository = dataSource.getRepository(User);
+    const userRepository = dataSource.getRepository(Users);
     try {
       const submissions = await incidentRepository
         .createQueryBuilder("submission")
@@ -483,7 +639,7 @@ export class IncidentSubmissionService {
   // }
 
   async updateIncident(
-    userId: number,
+    userId: number | any,
     incidentSubmissionId: number,
     newAnswers: { questionId: number; answer: string | string[] | Date }[]
   ) {

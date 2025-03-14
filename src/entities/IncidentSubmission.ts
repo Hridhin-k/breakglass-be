@@ -7,9 +7,9 @@ import {
   ManyToOne,
   OneToMany,
 } from "typeorm";
-import { User } from "./User";
 import { IncidentAnswer } from "./IncidentAnswer";
 import { IncidentMedia } from "./IncidentMedia";
+import { Users } from "./Users";
 
 @Entity()
 export class IncidentSubmission {
@@ -19,8 +19,8 @@ export class IncidentSubmission {
   @Column({ type: "bigint" })
   incidentNumber!: number;
 
-  @ManyToOne(() => User, (user) => user.submissions, { onDelete: "CASCADE" })
-  user!: User;
+  @ManyToOne(() => Users, (user) => user.submissions, { onDelete: "CASCADE" })
+  user!: Users;
 
   @Column({ type: "int", default: 1 })
   version!: number;
