@@ -21,163 +21,33 @@ interface FileData {
   description?: string;
 }
 export class IncidentSubmissionService {
-  // async uploadFileToS3(
-  //   fileBuffer: Buffer,
-  //   fileName: string,
-  //   contentType: string
-  // ): Promise<string> {
-  //   const bucketName = process.env.UPLOAD_BUCKET_NAME;
+  async uploadFileToS3(
+    fileBuffer: Buffer,
+    fileName: string,
+    contentType: string
+  ): Promise<string> {
+    const bucketName = process.env.UPLOAD_BUCKET_NAME;
 
-  //   if (!bucketName) {
-  //     throw new Error(
-  //       "UPLOAD_BUCKET_NAME is not defined in environment variables."
-  //     );
-  //   }
+    if (!bucketName) {
+      throw new Error(
+        "UPLOAD_BUCKET_NAME is not defined in environment variables."
+      );
+    }
 
-  //   const key = `${uuidv4()}-${fileName}`;
-  //   const uploadParams = {
-  //     Bucket: bucketName,
-  //     Key: key,
-  //     Body: fileBuffer,
-  //     ContentType: contentType,
-  //   };
+    const key = `${uuidv4()}-${fileName}`;
+    const uploadParams = {
+      Bucket: bucketName,
+      Key: key,
+      Body: fileBuffer,
+      ContentType: contentType,
+    };
 
-  //   await s3.upload(uploadParams).promise();
-  //   return `https://${bucketName}.s3.${process.env.UPLOAD_REGION}.amazonaws.com/${key}`;
-  // }
-  // async submitIncident(
-  //   userId: number,
-  //   answers: { questionId: number; answer: string | any | any[] }[]
-  // ) {
-  //   const dataSource = await connectDB();
-  //   const incidentRepository = dataSource.getRepository(IncidentSubmission);
-  //   const answerRepository = dataSource.getRepository(IncidentAnswer);
-  //   const questionRepository = dataSource.getRepository(IncidentQuestion);
-  //   const mediaRepository = dataSource.getRepository(IncidentMedia);
-
-  //   try {
-  //     // Step 1: Create a new incident submission
-  //     const submission = incidentRepository.create({
-  //       user: { id: userId },
-  //       incidentNumber: Date.now(),
-  //       version: 1,
-  //     });
-
-  //     await incidentRepository.save(submission);
-
-  //     // Step 2: Prepare answer entities
-  //     const answerEntities = await Promise.all(
-  //       answers.map(async ({ questionId, answer }) => {
-  //         const question = await questionRepository.findOne({
-  //           where: { id: questionId },
-  //         });
-
-  //         if (!question) {
-  //           throw new Error(`Question with ID ${questionId} not found.`);
-  //         }
-
-  //         const answerEntity = answerRepository.create({
-  //           incidentSubmission: submission,
-  //           question,
-  //           type: question.questionType,
-  //           version: 1,
-  //         });
-  //         // Store answer based on question type
-  //         switch (question.questionType) {
-  //           case "single_choice":
-  //             answerEntity.singleChoiceAnswer = answer as string;
-  //             break;
-  //           case "multiple_choice":
-  //             answerEntity.multipleChoiceAnswer = Array.isArray(answer)
-  //               ? answer
-  //               : [answer as string];
-  //             break;
-  //           case "date":
-  //             answerEntity.dateAnswer = new Date(answer as string);
-  //             break;
-  //           case "plain_text":
-  //             answerEntity.textAnswer = answer as string;
-  //             break;
-  //           case "map":
-  //             if (typeof answer === "string") {
-  //               try {
-  //                 answerEntity.mapAnswer = JSON.parse(answer);
-  //               } catch (error) {
-  //                 throw new Error(
-  //                   `Invalid map data format for question ${questionId}`
-  //                 );
-  //               }
-  //             } else {
-  //               answerEntity.mapAnswer = answer as {
-  //                 name: string;
-  //                 latitude: number;
-  //                 longitude: number;
-  //               };
-  //             }
-  //             break;
-  //           case "file":
-  //             if (Array.isArray(answer)) {
-  //               await Promise.all(
-  //                 answer.map(
-  //                   async (fileData: {
-  //                     fileName: string;
-  //                     file: string;
-  //                     contentType: string;
-  //                     description?: string;
-  //                   }) => {
-  //                     const fileBuffer = Buffer.from(fileData.file, "base64");
-  //                     const fileUrl = await this.uploadFileToS3(
-  //                       fileBuffer,
-  //                       fileData.fileName,
-  //                       fileData.contentType
-  //                     );
-
-  //                     const media = mediaRepository.create({
-  //                       incidentSubmission: submission,
-  //                       question,
-  //                       url: fileUrl,
-  //                       mimeType: fileData.contentType,
-  //                       version: 1,
-  //                       description: fileData.description,
-  //                     });
-  //                     await mediaRepository.save(media);
-  //                   }
-  //                 )
-  //               );
-  //             }
-  //             break;
-  //           default:
-  //             throw new Error(
-  //               `Invalid question type: ${question.questionType}`
-  //             );
-  //         }
-
-  //         return answerEntity;
-  //       })
-  //     );
-
-  //     // Step 3: Save answers to the database
-  //     await answerRepository.save(answerEntities);
-
-  //     return { message: "Incident submitted successfully", submission };
-  //   } catch (error) {
-  //     console.error(
-  //       "Error in IncidentSubmissionService (submitIncident):",
-  //       error
-  //     );
-  //     throw error;
-  //   } finally {
-  //     await dataSource.destroy();
-  //   }
-  // }
-
+    await s3.upload(uploadParams).promise();
+    return `https://${bucketName}.s3.${process.env.UPLOAD_REGION}.amazonaws.com/${key}`;
+  }
   async submitIncident(
     userId: number,
-    answers: {
-      questionId: number;
-      answer: string | any | any[];
-      uploadedFiles?: { key: string; mimeType: string }[];
-    }[]
+    answers: { questionId: number; answer: string | any | any[] }[]
   ) {
     const dataSource = await connectDB();
     const incidentRepository = dataSource.getRepository(IncidentSubmission);
@@ -185,117 +55,247 @@ export class IncidentSubmissionService {
     const questionRepository = dataSource.getRepository(IncidentQuestion);
     const mediaRepository = dataSource.getRepository(IncidentMedia);
 
-    const queryRunner = dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
     try {
+      // Step 1: Create a new incident submission
       const submission = incidentRepository.create({
         user: { id: userId },
         incidentNumber: Date.now(),
         version: 1,
       });
 
-      const savedSubmission = await queryRunner.manager.save(submission);
+      await incidentRepository.save(submission);
 
-      for (const { questionId, answer, uploadedFiles } of answers) {
-        const question = await questionRepository.findOne({
-          where: { id: questionId },
-        });
+      // Step 2: Prepare answer entities
+      const answerEntities = await Promise.all(
+        answers.map(async ({ questionId, answer }) => {
+          const question = await questionRepository.findOne({
+            where: { id: questionId },
+          });
 
-        if (!question) {
-          throw new Error(`Question with ID ${questionId} not found.`);
-        }
+          if (!question) {
+            throw new Error(`Question with ID ${questionId} not found.`);
+          }
 
-        const answerEntity = answerRepository.create({
-          incidentSubmission: savedSubmission,
-          question,
-          type: question.questionType,
-          version: 1,
-        });
+          const answerEntity = answerRepository.create({
+            incidentSubmission: submission,
+            question,
+            type: question.questionType,
+            version: 1,
+          });
+          // Store answer based on question type
+          switch (question.questionType) {
+            case "single_choice":
+              answerEntity.singleChoiceAnswer = answer as string;
+              break;
+            case "multiple_choice":
+              answerEntity.multipleChoiceAnswer = Array.isArray(answer)
+                ? answer
+                : [answer as string];
+              break;
+            case "date":
+              answerEntity.dateAnswer = new Date(answer as string);
+              break;
+            case "plain_text":
+              answerEntity.textAnswer = answer as string;
+              break;
+            case "map":
+              if (typeof answer === "string") {
+                try {
+                  answerEntity.mapAnswer = JSON.parse(answer);
+                } catch (error) {
+                  throw new Error(
+                    `Invalid map data format for question ${questionId}`
+                  );
+                }
+              } else {
+                answerEntity.mapAnswer = answer as {
+                  name: string;
+                  latitude: number;
+                  longitude: number;
+                };
+              }
+              break;
+            case "file":
+              if (Array.isArray(answer)) {
+                await Promise.all(
+                  answer.map(
+                    async (fileData: {
+                      fileName: string;
+                      file: string;
+                      contentType: string;
+                      description?: string;
+                    }) => {
+                      const fileBuffer = Buffer.from(fileData.file, "base64");
+                      const fileUrl = await this.uploadFileToS3(
+                        fileBuffer,
+                        fileData.fileName,
+                        fileData.contentType
+                      );
 
-        switch (question.questionType) {
-          case "single_choice":
-            answerEntity.singleChoiceAnswer = answer as string;
-            await queryRunner.manager.save(answerEntity);
-            break;
-          case "multiple_choice":
-            answerEntity.multipleChoiceAnswer = Array.isArray(answer)
-              ? answer
-              : [answer as string];
-            await queryRunner.manager.save(answerEntity);
-            break;
-          case "date":
-            answerEntity.dateAnswer = new Date(answer as string);
-            await queryRunner.manager.save(answerEntity);
-            break;
-          case "plain_text":
-            answerEntity.textAnswer = answer as string;
-            await queryRunner.manager.save(answerEntity);
-            break;
-          case "map":
-            if (typeof answer === "string") {
-              try {
-                answerEntity.mapAnswer = JSON.parse(answer);
-              } catch (error) {
-                throw new Error(
-                  `Invalid map data format for question ${questionId}`
+                      const media = mediaRepository.create({
+                        incidentSubmission: submission,
+                        question,
+                        url: fileUrl,
+                        mimeType: fileData.contentType,
+                        version: 1,
+                        description: fileData.description,
+                      });
+                      await mediaRepository.save(media);
+                    }
+                  )
                 );
               }
-            } else {
-              answerEntity.mapAnswer = answer as {
-                name: string;
-                latitude: number;
-                longitude: number;
-              };
-            }
-            await queryRunner.manager.save(answerEntity);
-            break;
-          case "file":
-            // Handle file uploads
-            if (uploadedFiles && uploadedFiles.length > 0) {
-              for (const file of uploadedFiles) {
-                const bucketName = process.env.UPLOAD_BUCKET_NAME; // Get bucket name from env
-                const region = process.env.UPLOAD_REGION || "us-east-1"; // Get region from env, default to us-east-1
-                const url = `https://${bucketName}.s3${
-                  region === "us-east-1" ? "" : `.${region}`
-                }.amazonaws.com/${file.key}`;
-                console.log(url);
+              break;
+            default:
+              throw new Error(
+                `Invalid question type: ${question.questionType}`
+              );
+          }
 
-                const media = mediaRepository.create({
-                  incidentSubmission: savedSubmission,
-                  question,
-                  url: url, // store the key
-                  mimeType: file.mimeType,
-                  version: 1,
-                });
-                await queryRunner.manager.save(media);
-              }
-            }
-            break;
-          default:
-            throw new Error(`Invalid question type: ${question.questionType}`);
-        }
-      }
+          return answerEntity;
+        })
+      );
 
-      await queryRunner.commitTransaction();
+      // Step 3: Save answers to the database
+      await answerRepository.save(answerEntities);
 
-      return {
-        message: "Incident submitted successfully",
-        submission: savedSubmission,
-      };
+      return { message: "Incident submitted successfully", submission };
     } catch (error) {
-      await queryRunner.rollbackTransaction();
       console.error(
         "Error in IncidentSubmissionService (submitIncident):",
         error
       );
       throw error;
     } finally {
-      await queryRunner.release();
       await dataSource.destroy();
     }
   }
+
+  // async submitIncident(
+  //   userId: number,
+  //   answers: {
+  //     questionId: number;
+  //     answer: string | any | any[];
+  //     uploadedFiles?: { key: string; mimeType: string }[];
+  //   }[]
+  // ) {
+  //   const dataSource = await connectDB();
+  //   const incidentRepository = dataSource.getRepository(IncidentSubmission);
+  //   const answerRepository = dataSource.getRepository(IncidentAnswer);
+  //   const questionRepository = dataSource.getRepository(IncidentQuestion);
+  //   const mediaRepository = dataSource.getRepository(IncidentMedia);
+
+  //   const queryRunner = dataSource.createQueryRunner();
+  //   await queryRunner.connect();
+  //   await queryRunner.startTransaction();
+
+  //   try {
+  //     const submission = incidentRepository.create({
+  //       user: { id: userId },
+  //       incidentNumber: Date.now(),
+  //       version: 1,
+  //     });
+
+  //     const savedSubmission = await queryRunner.manager.save(submission);
+
+  //     for (const { questionId, answer, uploadedFiles } of answers) {
+  //       const question = await questionRepository.findOne({
+  //         where: { id: questionId },
+  //       });
+
+  //       if (!question) {
+  //         throw new Error(`Question with ID ${questionId} not found.`);
+  //       }
+
+  //       const answerEntity = answerRepository.create({
+  //         incidentSubmission: savedSubmission,
+  //         question,
+  //         type: question.questionType,
+  //         version: 1,
+  //       });
+
+  //       switch (question.questionType) {
+  //         case "single_choice":
+  //           answerEntity.singleChoiceAnswer = answer as string;
+  //           await queryRunner.manager.save(answerEntity);
+  //           break;
+  //         case "multiple_choice":
+  //           answerEntity.multipleChoiceAnswer = Array.isArray(answer)
+  //             ? answer
+  //             : [answer as string];
+  //           await queryRunner.manager.save(answerEntity);
+  //           break;
+  //         case "date":
+  //           answerEntity.dateAnswer = new Date(answer as string);
+  //           await queryRunner.manager.save(answerEntity);
+  //           break;
+  //         case "plain_text":
+  //           answerEntity.textAnswer = answer as string;
+  //           await queryRunner.manager.save(answerEntity);
+  //           break;
+  //         case "map":
+  //           if (typeof answer === "string") {
+  //             try {
+  //               answerEntity.mapAnswer = JSON.parse(answer);
+  //             } catch (error) {
+  //               throw new Error(
+  //                 `Invalid map data format for question ${questionId}`
+  //               );
+  //             }
+  //           } else {
+  //             answerEntity.mapAnswer = answer as {
+  //               name: string;
+  //               latitude: number;
+  //               longitude: number;
+  //             };
+  //           }
+  //           await queryRunner.manager.save(answerEntity);
+  //           break;
+  //         case "file":
+  //           // Handle file uploads
+  //           if (uploadedFiles && uploadedFiles.length > 0) {
+  //             for (const file of uploadedFiles) {
+  //               const bucketName = process.env.UPLOAD_BUCKET_NAME; // Get bucket name from env
+  //               const region = process.env.UPLOAD_REGION || "us-east-1"; // Get region from env, default to us-east-1
+  //               const url = `https://${bucketName}.s3${
+  //                 region === "us-east-1" ? "" : `.${region}`
+  //               }.amazonaws.com/${file.key}`;
+  //               console.log(url);
+
+  //               const media = mediaRepository.create({
+  //                 incidentSubmission: savedSubmission,
+  //                 question,
+  //                 url: url, // store the key
+  //                 mimeType: file.mimeType,
+  //                 version: 1,
+  //               });
+  //               await queryRunner.manager.save(media);
+  //             }
+  //           }
+  //           break;
+  //         default:
+  //           throw new Error(`Invalid question type: ${question.questionType}`);
+  //       }
+  //     }
+
+  //     await queryRunner.commitTransaction();
+
+  //     return {
+  //       message: "Incident submitted successfully",
+  //       submission: savedSubmission,
+  //     };
+  //   } catch (error) {
+  //     await queryRunner.rollbackTransaction();
+  //     console.error(
+  //       "Error in IncidentSubmissionService (submitIncident):",
+  //       error
+  //     );
+  //     throw error;
+  //   } finally {
+  //     await queryRunner.release();
+  //     await dataSource.destroy();
+  //   }
+  // }
 
   // Get all incidents of a user
   async getAllUserSubmission(
