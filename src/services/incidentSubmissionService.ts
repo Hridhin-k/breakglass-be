@@ -13,7 +13,13 @@ import dotenv from "dotenv";
 import { Users } from "../entities/Users";
 
 dotenv.config(); // Load environment variables
-const s3 = new AWS.S3();
+const s3 = new AWS.S3({
+  region: process.env.UPLOAD_REGION,
+  credentials: {
+    accessKeyId: process.env.UPLOAD_KEY_ID || "",
+    secretAccessKey: process.env.UPLOAD_ACCESS_KEY || "",
+  }, // Ensure this matches the bucket region
+});
 interface FileData {
   fileName: string;
   file: string;
@@ -42,8 +48,15 @@ export class IncidentSubmissionService {
       ContentType: contentType,
     };
 
-    await s3.upload(uploadParams).promise();
-    return `https://${bucketName}.s3.${process.env.UPLOAD_REGION}.amazonaws.com/${key}`;
+    try {
+      console.log(`Uploading file to S3: ${bucketName}/${key}`);
+      const result = await s3.upload(uploadParams).promise();
+      console.log(`File uploaded successfully`, result);
+      return result.Location;
+    } catch (error: any) {
+      console.error("S3 Upload Error:", error); // Log detailed error
+      throw new Error(`Failed to upload file to S3: ${error.message}`);
+    }
   }
   async submitIncident(
     userId: number,
@@ -358,16 +371,28 @@ export class IncidentSubmissionService {
           .createQueryBuilder("submission")
           .leftJoinAndSelect("submission.answers", "answer")
           .leftJoinAndSelect("answer.question", "question")
+          .leftJoinAndSelect("submission.media", "media")
+          .leftJoinAndSelect("media.question", "mediaQuestion")
           .where("submission.userId = :userId", { userId })
           .andWhere((qb) => {
-            const subQuery = qb
+            const latestAnswerVersionSubQuery = qb
               .subQuery()
               .select("MAX(latestAnswer.version)", "maxVersion")
               .from(IncidentAnswer, "latestAnswer")
-              .where("latestAnswer.questionId = answer.questionId") // Correlate
+              .where("latestAnswer.questionId = answer.questionId") // Correlate with answers
               .getQuery();
 
-            return `answer.version = (${subQuery})`; // Direct comparison for max version
+            const latestMediaVersionSubQuery = qb
+              .subQuery()
+              .select("MAX(latestMedia.version)", "maxVersion")
+              .from(IncidentMedia, "latestMedia")
+              .where("latestMedia.questionId = media.questionId") // Correlate with media
+              .getQuery();
+
+            return `
+      answer.version = (${latestAnswerVersionSubQuery}) 
+      AND media.version = (${latestMediaVersionSubQuery})
+    `;
           })
           .orderBy("question.order", "ASC")
           .getMany();
@@ -443,18 +468,28 @@ export class IncidentSubmissionService {
           .createQueryBuilder("submission")
           .leftJoinAndSelect("submission.answers", "answer")
           .leftJoinAndSelect("answer.question", "question")
-          .where("submission.incidentNumber = :incidentNumber", {
-            incidentNumber,
-          })
+          .leftJoinAndSelect("submission.media", "media")
+          .leftJoinAndSelect("media.question", "mediaQuestion")
+          .where("submission.userId = :userId", { userId })
           .andWhere((qb) => {
-            const subQuery = qb
+            const latestAnswerVersionSubQuery = qb
               .subQuery()
               .select("MAX(latestAnswer.version)", "maxVersion")
               .from(IncidentAnswer, "latestAnswer")
-              .where("latestAnswer.questionId = answer.questionId") // Correlate
+              .where("latestAnswer.questionId = answer.questionId") // Correlate with answers
               .getQuery();
 
-            return `answer.version = (${subQuery})`; // Direct comparison for max version
+            const latestMediaVersionSubQuery = qb
+              .subQuery()
+              .select("MAX(latestMedia.version)", "maxVersion")
+              .from(IncidentMedia, "latestMedia")
+              .where("latestMedia.questionId = media.questionId") // Correlate with media
+              .getQuery();
+
+            return `
+    answer.version = (${latestAnswerVersionSubQuery}) 
+    AND media.version = (${latestMediaVersionSubQuery})
+  `;
           })
           .orderBy("question.order", "ASC")
           .getMany();
@@ -480,15 +515,27 @@ export class IncidentSubmissionService {
         .leftJoinAndSelect("submission.answers", "answer")
         .leftJoinAndSelect("answer.question", "question")
         .leftJoinAndSelect("submission.user", "user") // Eager load the user relationship
+        .leftJoinAndSelect("submission.media", "media")
+        .leftJoinAndSelect("media.question", "mediaQuestion")
         .andWhere((qb) => {
-          const subQuery = qb
+          const latestAnswerVersionSubQuery = qb
             .subQuery()
             .select("MAX(latestAnswer.version)", "maxVersion")
             .from(IncidentAnswer, "latestAnswer")
             .where("latestAnswer.questionId = answer.questionId")
             .getQuery();
 
-          return `answer.version = (${subQuery})`;
+          const latestMediaVersionSubQuery = qb
+            .subQuery()
+            .select("MAX(latestMedia.version)", "maxVersion")
+            .from(IncidentMedia, "latestMedia")
+            .where("latestMedia.questionId = media.questionId")
+            .getQuery();
+
+          return `
+          answer.version = (${latestAnswerVersionSubQuery}) 
+          AND media.version = (${latestMediaVersionSubQuery})
+        `;
         })
         .orderBy("question.order", "ASC")
         .getMany();

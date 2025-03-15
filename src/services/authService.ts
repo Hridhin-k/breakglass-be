@@ -63,8 +63,8 @@ export class AuthService {
       }
 
       // Generate OTP
-      // const otp = crypto.randomInt(100000, 999999).toString();
-      const otp = "555555";
+      const otp = crypto.randomInt(100000, 999999).toString();
+      // const otp = "555555";
       const otpExpiresAt = Date.now() + 10 * 60 * 1000000; // Expires in 60 mins
 
       // Update user status
@@ -182,10 +182,10 @@ export class AuthService {
       console.log(user, "user");
 
       if (!user) {
-        throw new Error("User not found. Please request access first.");
+        return "User not found. Please request access first.";
       }
       if (user.status === "blocked") {
-        throw new Error("User is blocked. Please contact support.");
+        return "User is blocked. Please contact support.";
       }
 
       //  Prevent login or registration if user is rejected
@@ -198,9 +198,7 @@ export class AuthService {
       // If OTP is NOT provided, attempt login
       if (otp === null || otp === undefined) {
         if (user.status !== "registered") {
-          throw new Error(
-            "User is not registered. Please complete registration first."
-          );
+          return "User is not registered. Please complete registration first.";
         }
 
         if (!user.password) {
