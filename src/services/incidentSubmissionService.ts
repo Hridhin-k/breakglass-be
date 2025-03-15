@@ -3,7 +3,6 @@ import { connectDB } from "../utils/database";
 import { IncidentSubmission } from "../entities/IncidentSubmission";
 import { IncidentAnswer } from "../entities/IncidentAnswer";
 import { IncidentQuestion } from "../entities/IncidentQuestion";
-import { User } from "../entities/User";
 import { log } from "node:console";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { v4 as uuidv4 } from "uuid";
@@ -11,9 +10,16 @@ import * as mime from "mime-types";
 import { IncidentMedia } from "../entities/IncidentMedia";
 import AWS from "aws-sdk";
 import dotenv from "dotenv";
+import { Users } from "../entities/Users";
 
 dotenv.config(); // Load environment variables
-const s3 = new AWS.S3();
+const s3 = new AWS.S3({
+  region: process.env.UPLOAD_REGION,
+  credentials: {
+    accessKeyId: process.env.UPLOAD_KEY_ID || "",
+    secretAccessKey: process.env.UPLOAD_ACCESS_KEY || "",
+  }, // Ensure this matches the bucket region
+});
 interface FileData {
   fileName: string;
   file: string;
@@ -26,11 +32,11 @@ export class IncidentSubmissionService {
     fileName: string,
     contentType: string
   ): Promise<string> {
-    const bucketName = process.env.AWS_S3_BUCKET_NAME;
+    const bucketName = process.env.UPLOAD_BUCKET_NAME;
 
     if (!bucketName) {
       throw new Error(
-        "AWS_S3_BUCKET_NAME is not defined in environment variables."
+        "UPLOAD_BUCKET_NAME is not defined in environment variables."
       );
     }
 
@@ -42,8 +48,15 @@ export class IncidentSubmissionService {
       ContentType: contentType,
     };
 
-    await s3.upload(uploadParams).promise();
-    return `https://${bucketName}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+    try {
+      console.log(`Uploading file to S3: ${bucketName}/${key}`);
+      const result = await s3.upload(uploadParams).promise();
+      console.log(`File uploaded successfully`, result);
+      return result.Location;
+    } catch (error: any) {
+      console.error("S3 Upload Error:", error); // Log detailed error
+      throw new Error(`Failed to upload file to S3: ${error.message}`);
+    }
   }
   async submitIncident(
     userId: number,
@@ -171,6 +184,132 @@ export class IncidentSubmissionService {
     }
   }
 
+  // async submitIncident(
+  //   userId: number,
+  //   answers: {
+  //     questionId: number;
+  //     answer: string | any | any[];
+  //     uploadedFiles?: { key: string; mimeType: string }[];
+  //   }[]
+  // ) {
+  //   const dataSource = await connectDB();
+  //   const incidentRepository = dataSource.getRepository(IncidentSubmission);
+  //   const answerRepository = dataSource.getRepository(IncidentAnswer);
+  //   const questionRepository = dataSource.getRepository(IncidentQuestion);
+  //   const mediaRepository = dataSource.getRepository(IncidentMedia);
+
+  //   const queryRunner = dataSource.createQueryRunner();
+  //   await queryRunner.connect();
+  //   await queryRunner.startTransaction();
+
+  //   try {
+  //     const submission = incidentRepository.create({
+  //       user: { id: userId },
+  //       incidentNumber: Date.now(),
+  //       version: 1,
+  //     });
+
+  //     const savedSubmission = await queryRunner.manager.save(submission);
+
+  //     for (const { questionId, answer, uploadedFiles } of answers) {
+  //       const question = await questionRepository.findOne({
+  //         where: { id: questionId },
+  //       });
+
+  //       if (!question) {
+  //         throw new Error(`Question with ID ${questionId} not found.`);
+  //       }
+
+  //       const answerEntity = answerRepository.create({
+  //         incidentSubmission: savedSubmission,
+  //         question,
+  //         type: question.questionType,
+  //         version: 1,
+  //       });
+
+  //       switch (question.questionType) {
+  //         case "single_choice":
+  //           answerEntity.singleChoiceAnswer = answer as string;
+  //           await queryRunner.manager.save(answerEntity);
+  //           break;
+  //         case "multiple_choice":
+  //           answerEntity.multipleChoiceAnswer = Array.isArray(answer)
+  //             ? answer
+  //             : [answer as string];
+  //           await queryRunner.manager.save(answerEntity);
+  //           break;
+  //         case "date":
+  //           answerEntity.dateAnswer = new Date(answer as string);
+  //           await queryRunner.manager.save(answerEntity);
+  //           break;
+  //         case "plain_text":
+  //           answerEntity.textAnswer = answer as string;
+  //           await queryRunner.manager.save(answerEntity);
+  //           break;
+  //         case "map":
+  //           if (typeof answer === "string") {
+  //             try {
+  //               answerEntity.mapAnswer = JSON.parse(answer);
+  //             } catch (error) {
+  //               throw new Error(
+  //                 `Invalid map data format for question ${questionId}`
+  //               );
+  //             }
+  //           } else {
+  //             answerEntity.mapAnswer = answer as {
+  //               name: string;
+  //               latitude: number;
+  //               longitude: number;
+  //             };
+  //           }
+  //           await queryRunner.manager.save(answerEntity);
+  //           break;
+  //         case "file":
+  //           // Handle file uploads
+  //           if (uploadedFiles && uploadedFiles.length > 0) {
+  //             for (const file of uploadedFiles) {
+  //               const bucketName = process.env.UPLOAD_BUCKET_NAME; // Get bucket name from env
+  //               const region = process.env.UPLOAD_REGION || "us-east-1"; // Get region from env, default to us-east-1
+  //               const url = `https://${bucketName}.s3${
+  //                 region === "us-east-1" ? "" : `.${region}`
+  //               }.amazonaws.com/${file.key}`;
+  //               console.log(url);
+
+  //               const media = mediaRepository.create({
+  //                 incidentSubmission: savedSubmission,
+  //                 question,
+  //                 url: url, // store the key
+  //                 mimeType: file.mimeType,
+  //                 version: 1,
+  //               });
+  //               await queryRunner.manager.save(media);
+  //             }
+  //           }
+  //           break;
+  //         default:
+  //           throw new Error(`Invalid question type: ${question.questionType}`);
+  //       }
+  //     }
+
+  //     await queryRunner.commitTransaction();
+
+  //     return {
+  //       message: "Incident submitted successfully",
+  //       submission: savedSubmission,
+  //     };
+  //   } catch (error) {
+  //     await queryRunner.rollbackTransaction();
+  //     console.error(
+  //       "Error in IncidentSubmissionService (submitIncident):",
+  //       error
+  //     );
+  //     throw error;
+  //   } finally {
+  //     await queryRunner.release();
+  //     await dataSource.destroy();
+  //   }
+  // }
+
   // Get all incidents of a user
   async getAllUserSubmission(
     userId: number,
@@ -179,12 +318,27 @@ export class IncidentSubmissionService {
   ) {
     const dataSource = await connectDB();
     const incidentRepository = dataSource.getRepository(IncidentSubmission);
-    const userRepository = dataSource.getRepository(User);
+    const userRepository = dataSource.getRepository(Users);
     const answerRepository = dataSource.getRepository(IncidentAnswer);
     try {
       const user = await userRepository.findOne({
         where: { id: userId },
-        select: ["id", "username", "email"],
+        select: [
+          "id",
+          "username",
+          "email",
+          "firstName",
+          "lastName",
+          "mobileNumber",
+          "address",
+          "city",
+          "state",
+          "zipCode",
+          "institution",
+          "category",
+          "classYear",
+          "majoringIn",
+        ],
       });
 
       if (!user) {
@@ -217,16 +371,28 @@ export class IncidentSubmissionService {
           .createQueryBuilder("submission")
           .leftJoinAndSelect("submission.answers", "answer")
           .leftJoinAndSelect("answer.question", "question")
+          .leftJoinAndSelect("submission.media", "media")
+          .leftJoinAndSelect("media.question", "mediaQuestion")
           .where("submission.userId = :userId", { userId })
           .andWhere((qb) => {
-            const subQuery = qb
+            const latestAnswerVersionSubQuery = qb
               .subQuery()
               .select("MAX(latestAnswer.version)", "maxVersion")
               .from(IncidentAnswer, "latestAnswer")
-              .where("latestAnswer.questionId = answer.questionId") // Correlate
+              .where("latestAnswer.questionId = answer.questionId") // Correlate with answers
               .getQuery();
 
-            return `answer.version = (${subQuery})`; // Direct comparison for max version
+            const latestMediaVersionSubQuery = qb
+              .subQuery()
+              .select("MAX(latestMedia.version)", "maxVersion")
+              .from(IncidentMedia, "latestMedia")
+              .where("latestMedia.questionId = media.questionId") // Correlate with media
+              .getQuery();
+
+            return `
+      answer.version = (${latestAnswerVersionSubQuery}) 
+      AND media.version = (${latestMediaVersionSubQuery})
+    `;
           })
           .orderBy("question.order", "ASC")
           .getMany();
@@ -249,12 +415,27 @@ export class IncidentSubmissionService {
   ) {
     const dataSource = await connectDB();
     const incidentRepository = dataSource.getRepository(IncidentSubmission);
-    const userRepository = dataSource.getRepository(User);
+    const userRepository = dataSource.getRepository(Users);
     const answerRepository = dataSource.getRepository(IncidentAnswer);
     try {
       const user = await userRepository.findOne({
         where: { id: userId },
-        select: ["id", "username", "email"],
+        select: [
+          "id",
+          "username",
+          "email",
+          "firstName",
+          "lastName",
+          "mobileNumber",
+          "address",
+          "city",
+          "state",
+          "zipCode",
+          "institution",
+          "category",
+          "classYear",
+          "majoringIn",
+        ],
       });
 
       if (!user) {
@@ -287,18 +468,28 @@ export class IncidentSubmissionService {
           .createQueryBuilder("submission")
           .leftJoinAndSelect("submission.answers", "answer")
           .leftJoinAndSelect("answer.question", "question")
-          .where("submission.incidentNumber = :incidentNumber", {
-            incidentNumber,
-          })
+          .leftJoinAndSelect("submission.media", "media")
+          .leftJoinAndSelect("media.question", "mediaQuestion")
+          .where("submission.userId = :userId", { userId })
           .andWhere((qb) => {
-            const subQuery = qb
+            const latestAnswerVersionSubQuery = qb
               .subQuery()
               .select("MAX(latestAnswer.version)", "maxVersion")
               .from(IncidentAnswer, "latestAnswer")
-              .where("latestAnswer.questionId = answer.questionId") // Correlate
+              .where("latestAnswer.questionId = answer.questionId") // Correlate with answers
               .getQuery();
 
-            return `answer.version = (${subQuery})`; // Direct comparison for max version
+            const latestMediaVersionSubQuery = qb
+              .subQuery()
+              .select("MAX(latestMedia.version)", "maxVersion")
+              .from(IncidentMedia, "latestMedia")
+              .where("latestMedia.questionId = media.questionId") // Correlate with media
+              .getQuery();
+
+            return `
+    answer.version = (${latestAnswerVersionSubQuery}) 
+    AND media.version = (${latestMediaVersionSubQuery})
+  `;
           })
           .orderBy("question.order", "ASC")
           .getMany();
@@ -317,22 +508,34 @@ export class IncidentSubmissionService {
   async getAllSubmissions(requestedVersion?: number) {
     const dataSource = await connectDB();
     const incidentRepository = dataSource.getRepository(IncidentSubmission);
-    const userRepository = dataSource.getRepository(User);
+    const userRepository = dataSource.getRepository(Users);
     try {
       const submissions = await incidentRepository
         .createQueryBuilder("submission")
         .leftJoinAndSelect("submission.answers", "answer")
         .leftJoinAndSelect("answer.question", "question")
         .leftJoinAndSelect("submission.user", "user") // Eager load the user relationship
+        .leftJoinAndSelect("submission.media", "media")
+        .leftJoinAndSelect("media.question", "mediaQuestion")
         .andWhere((qb) => {
-          const subQuery = qb
+          const latestAnswerVersionSubQuery = qb
             .subQuery()
             .select("MAX(latestAnswer.version)", "maxVersion")
             .from(IncidentAnswer, "latestAnswer")
             .where("latestAnswer.questionId = answer.questionId")
             .getQuery();
 
-          return `answer.version = (${subQuery})`;
+          const latestMediaVersionSubQuery = qb
+            .subQuery()
+            .select("MAX(latestMedia.version)", "maxVersion")
+            .from(IncidentMedia, "latestMedia")
+            .where("latestMedia.questionId = media.questionId")
+            .getQuery();
+
+          return `
+          answer.version = (${latestAnswerVersionSubQuery}) 
+          AND media.version = (${latestMediaVersionSubQuery})
+        `;
         })
         .orderBy("question.order", "ASC")
         .getMany();
@@ -483,7 +686,7 @@ export class IncidentSubmissionService {
   // }
 
   async updateIncident(
-    userId: number,
+    userId: number | any,
     incidentSubmissionId: number,
     newAnswers: { questionId: number; answer: string | string[] | Date }[]
   ) {

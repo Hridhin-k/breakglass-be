@@ -74,7 +74,7 @@ export const uploadMediaHandler = async (
       }
 
       const fileBuffer = Buffer.from(file, "base64");
-      const bucketName = process.env.AWS_S3_BUCKET_NAME;
+      const bucketName = process.env.UPLOAD_BUCKET_NAME;
 
       if (!bucketName) {
         return {

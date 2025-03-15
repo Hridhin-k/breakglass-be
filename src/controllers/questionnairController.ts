@@ -57,9 +57,9 @@ export class QuestionController {
     }
   }
 
-  async getQuestions() {
+  async getQuestions(requestedUserId?: any) {
     try {
-      const result = await this.questionService.getQuestions();
+      const result = await this.questionService.getQuestions(requestedUserId);
       return {
         statusCode: 200,
         headers: {

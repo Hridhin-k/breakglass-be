@@ -1,131 +1,299 @@
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 import { connectDB } from "../utils/database";
-import { User } from "../entities/User";
-import { generateAccessToken, generateRefreshToken } from "../utils/authUtils";
+import {
+  generateAccessToken,
+  generateRefreshToken,
+  newGenerateAccessToken,
+  newGenerateRefreshToken,
+} from "../utils/authUtils";
+import crypto from "crypto";
+import { sendEmail } from "../utils/emailService";
+import { Users } from "../entities/Users";
 
 export class AuthService {
-  async registerUser(userData: {
-    username: string;
-    email: string;
-    password: string;
-  }) {
-    const { username, email, password } = userData;
+  /**
+   * Request access to register
+   */
+  async requestAccess(email: string) {
     const dataSource = await connectDB();
-    const userRepository = dataSource.getRepository(User);
+    const userRepository = dataSource.getRepository(Users);
 
     try {
-      // Check if user exists
-      const existingUser = await userRepository.findOne({
-        where: [{ username }, { email }],
-      });
+      // Check if the email is already in use
+      const existingUser = await userRepository.findOne({ where: { email } });
+
       if (existingUser) {
-        throw new Error(
-          existingUser.username === username
-            ? "Username already exists"
-            : "Email already exists"
-        );
+        if (existingUser.status === "registered") {
+          throw new Error("Email is already registered.");
+        } else if (existingUser.status === "pending") {
+          throw new Error("Access request is already pending.");
+        }
       }
 
-      // Hash password and save user
-      const hashedPassword = await bcrypt.hash(password, 10);
-      const newUser = userRepository.create({
-        username,
-        email,
-        password: hashedPassword,
-      });
-      await userRepository.save(newUser);
-      // Generate tokens
-      const accessToken = generateAccessToken(newUser);
-      const refreshToken = generateRefreshToken(newUser);
+      // Create new request
+      const newRequest = userRepository.create({ email, status: "pending" });
+      await userRepository.save(newRequest);
 
-      // Store refresh token in the database (optional: store in Redis or another secure storage)
-      newUser.refreshToken = refreshToken;
-      await userRepository.save(newUser);
       return {
-        message: "User registered successfully",
-        user: { username, email },
-        accessToken,
-        refreshToken,
+        message: "Access request submitted. Waiting for admin approval.",
       };
     } catch (error) {
-      console.error("Error in AuthService (registerUser):", error);
+      console.error("Error in AuthService (requestAccess):", error);
       throw error;
     } finally {
       await dataSource.destroy();
     }
   }
 
-  async loginUser(credentials: { username: string; password: string }) {
-    //mention return type here
-    const { username, password } = credentials;
+  /**
+   * Admin approves request and generates OTP
+   */
+  async approveRequest(email: string) {
     const dataSource = await connectDB();
-    const userRepository = dataSource.getRepository(User);
+    const userRepository = dataSource.getRepository(Users);
 
     try {
-      // Find user
-      const user = await userRepository.findOne({ where: { username } });
+      // Find user request
+      const user = await userRepository.findOne({
+        where: { email, status: "pending" },
+      });
+
       if (!user) {
-        throw new Error("User not found");
+        throw new Error("No pending request found for this email.");
       }
 
-      // Validate password
-      const isPasswordValid = await bcrypt.compare(password, user.password);
-      if (!isPasswordValid) {
-        throw new Error("Invalid password");
+      // Generate OTP
+      const otp = crypto.randomInt(100000, 999999).toString();
+      // const otp = "555555";
+      const otpExpiresAt = Date.now() + 10 * 60 * 1000000; // Expires in 60 mins
+
+      // Update user status
+      user.status = "approved";
+      user.otp = otp;
+      user.otpExpiresAt = otpExpiresAt;
+      await userRepository.save(user);
+
+      // TODO: Send OTP via email (implement an email service)
+      await sendEmail(email, "otp", { otp });
+      console.log(`OTP for ${email}: ${otp}`);
+
+      return { message: "User approved, OTP sent." };
+    } catch (error) {
+      console.error("Error in AuthService (approveRequest):", error);
+      throw error;
+    } finally {
+      await dataSource.destroy();
+    }
+  }
+  async blockUser(email: string) {
+    console.log(email, "block api");
+
+    const dataSource = await connectDB();
+    const userRepository = dataSource.getRepository(Users);
+
+    try {
+      // Find user request
+      const user = await userRepository.findOne({
+        where: { email, status: "registered" },
+      });
+
+      if (!user) {
+        throw new Error("No pending request found for this email.");
       }
 
-      // Generate token
-      // const token = jwt.sign(
-      //   { userId: user.id, username: user.username },
-      //   process.env.JWT_SECRET as string,
-      //   {
-      //     expiresIn: "24h",
-      //   }
-      // );
+      // Update user status
+      user.status = "blocked";
+      await userRepository.save(user);
+
+      return { message: "User blocked." };
+    } catch (error) {
+      console.error("Error in AuthService (blockUser):", error);
+      throw error;
+    } finally {
+      await dataSource.destroy();
+    }
+  }
+  async unblockUser(email: string) {
+    console.log(email, "unblock api");
+
+    const dataSource = await connectDB();
+    const userRepository = dataSource.getRepository(Users);
+
+    try {
+      // Find user request
+      const user = await userRepository.findOne({
+        where: { email, status: "blocked" },
+      });
+
+      if (!user) {
+        throw new Error("No pending request found for this email.");
+      }
+
+      // Update user status
+      user.status = "registered";
+      await userRepository.save(user);
+
+      return { message: "User unblocked." };
+    } catch (error) {
+      console.error("Error in AuthService (unblockUser):", error);
+      throw error;
+    } finally {
+      await dataSource.destroy();
+    }
+  }
+  async rejectRequest(email: string) {
+    const dataSource = await connectDB();
+    const userRepository = dataSource.getRepository(Users);
+
+    try {
+      // Find user request
+      const user = await userRepository.findOne({
+        where: { email, status: "pending" },
+      });
+
+      if (!user) {
+        throw new Error("No pending request found for this email.");
+      }
+
+      // Update user status
+      user.status = "rejected";
+      await userRepository.save(user);
+
+      return { message: "User rejected." };
+    } catch (error) {
+      console.error("Error in AuthService (rejectRequest):", error);
+      throw error;
+    } finally {
+      await dataSource.destroy();
+    }
+  }
+
+  /**
+   * Register or Login in one function
+   */
+  async registerOrLogin(email: string, password: string, otp?: string) {
+    console.log(otp, "otp");
+
+    const dataSource = await connectDB();
+    const userRepository = dataSource.getRepository(Users);
+
+    try {
+      const user = await userRepository.findOne({ where: { email } });
+      console.log(user, "user");
+
+      if (!user) {
+        return "User not found. Please request access first.";
+      }
+      if (user.status === "blocked") {
+        return "User is blocked. Please contact support.";
+      }
+
+      //  Prevent login or registration if user is rejected
+      if (user.status === "rejected") {
+        throw new Error(
+          "Your registration request was rejected. Please contact support for more details."
+        );
+      }
+
+      // If OTP is NOT provided, attempt login
+      if (otp === null || otp === undefined) {
+        if (user.status !== "registered") {
+          return "User is not registered. Please complete registration first.";
+        }
+
+        if (!user.password) {
+          throw new Error("User exists but no password is set.");
+        }
+
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) {
+          throw new Error("Invalid password.");
+        }
+
+        // Generate tokens
+        const accessToken = newGenerateAccessToken(user);
+        const refreshToken = newGenerateRefreshToken(user);
+        user.refreshToken = refreshToken;
+        user.lastLogin = new Date();
+
+        await userRepository.save(user);
+
+        return {
+          message: "Login successful",
+          user: {
+            id: user.id,
+            status: user.status,
+            email: user.email,
+            createdAt: user.createdAt,
+          },
+          accessToken,
+          refreshToken,
+        };
+      }
+
+      // If OTP is provided, attempt registration
+      if (user.status === "registered") {
+        throw new Error("User is already registered.");
+      } else if (user.status !== "approved") {
+        throw new Error("User is not approved for registration.");
+      }
+      if (otp !== user.otp || Date.now() > user.otpExpiresAt!) {
+        throw new Error("Invalid or expired OTP.");
+      }
+
+      // Register user
+      const hashedPassword = await bcrypt.hash(password, 10);
+      user.password = hashedPassword;
+      user.status = "registered";
+      //   user.otp = null;
+      //   user.otpExpiresAt = null;
+
       // Generate tokens
-      const accessToken = generateAccessToken(user);
-      const refreshToken = generateRefreshToken(user);
-
+      const accessToken = newGenerateAccessToken(user);
+      const refreshToken = newGenerateRefreshToken(user);
       user.refreshToken = refreshToken;
+
       await userRepository.save(user);
       return {
-        message: "Login successful",
+        message: "Registration successful",
         user: {
           id: user.id,
-          username: user.username,
+          status: user.status,
           email: user.email,
           createdAt: user.createdAt,
-          updatedAt: user.updatedAt,
         },
         accessToken,
         refreshToken,
       };
     } catch (error) {
-      console.error("Error in AuthService (loginUser):", error);
+      console.error("Error in AuthService (registerOrLogin):", error);
       throw error;
     } finally {
       await dataSource.destroy();
     }
   }
 
+  /**
+   * Refresh access token
+   */
   async refreshAccessToken(refreshToken: string) {
     const dataSource = await connectDB();
-    const userRepository = dataSource.getRepository(User);
+    const userRepository = dataSource.getRepository(Users);
 
     try {
-      // Find user by refresh token
       const user = await userRepository.findOne({ where: { refreshToken } });
+      console.log(user, "user");
+
       if (!user) {
-        throw new Error("Invalid refresh token");
+        throw new Error("Invalid refresh token.");
       }
 
-      // Generate new access token
-      const newAccessToken = generateAccessToken(user);
-
-      return {
-        accessToken: newAccessToken,
-      };
+      const newAccessToken = newGenerateAccessToken(user);
+      const newRefreshToken = newGenerateRefreshToken(user);
+      // Update the user's refresh token in the database
+      user.refreshToken = newRefreshToken;
+      await userRepository.save(user);
+      return { accessToken: newAccessToken, refreshToken: newRefreshToken };
     } catch (error) {
       console.error("Error in AuthService (refreshAccessToken):", error);
       throw error;

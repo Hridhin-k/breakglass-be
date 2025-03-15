@@ -1,7 +1,7 @@
 import jwt from "jsonwebtoken";
 import { APIGatewayProxyEvent } from "aws-lambda";
-import { User } from "../entities/User";
 import crypto from "crypto";
+import { Users } from "../entities/Users";
 
 export const authenticateToken = (event: APIGatewayProxyEvent) => {
   const authHeader = event.headers.Authorization || event.headers.authorization;
@@ -32,14 +32,24 @@ export const authenticateToken = (event: APIGatewayProxyEvent) => {
     return null;
   }
 };
-export const generateAccessToken = (user: User): string => {
+export const generateAccessToken = (user: Users): string => {
   return jwt.sign(
     { userId: user.id, username: user.username },
     process.env.JWT_SECRET as string,
     { expiresIn: "1440m" } // Access token expires in 24 hours
   );
 };
+export const newGenerateAccessToken = (user: Users): string => {
+  return jwt.sign(
+    { userId: user.id, username: user.email },
+    process.env.JWT_SECRET as string,
+    { expiresIn: "1440m" } // Access token expires in 24 hours
+  );
+};
 
-export const generateRefreshToken = (user: User): string => {
+export const generateRefreshToken = (user: Users): string => {
+  return crypto.randomBytes(64).toString("hex"); // Generate a random refresh token
+};
+export const newGenerateRefreshToken = (user: Users): string => {
   return crypto.randomBytes(64).toString("hex"); // Generate a random refresh token
 };

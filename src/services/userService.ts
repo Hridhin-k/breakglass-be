@@ -1,13 +1,27 @@
+import { In } from "typeorm";
+import { Users } from "../entities/Users";
 import { connectDB } from "../utils/database";
-import { User } from "../entities/User";
 
 export class UserService {
-  async getUserData(requestedUserId?: number) {
+  async getUserData(requestedUserId?: number, pendingUsers?: string) {
+    console.log(requestedUserId, pendingUsers);
+
     const dataSource = await connectDB();
-    const userRepository = dataSource.getRepository(User);
+    const userRepository = dataSource.getRepository(Users);
 
     try {
-      const whereCondition = requestedUserId ? { id: requestedUserId } : {}; // Apply filter if userId is provided
+      const whereCondition: any = {}; // Initialize empty filter
+
+      if (requestedUserId) {
+        whereCondition.id = requestedUserId;
+      }
+
+      if (pendingUsers) {
+        whereCondition.status = pendingUsers; // Add status filter if pendingUsers is provided
+      } else {
+        // Default to fetching users with status "registered" or "blocked"
+        whereCondition.status = In(["registered", "blocked"]);
+      }
 
       const users = await userRepository.find({
         where: whereCondition, // Filter by userId if provided
@@ -20,6 +34,8 @@ export class UserService {
         userId: user.id,
         username: user.username,
         email: user.email,
+        status: user.status,
+        lastLogin: user.lastLogin,
         firstName: user.firstName,
         lastName: user.lastName,
         mobileNumber: user.mobileNumber,
@@ -31,6 +47,7 @@ export class UserService {
         classYear: user.classYear,
         majoringIn: user.majoringIn,
         studentOrganization: user.studentOrganization,
+        category: user.category,
         createdAt: user.createdAt,
         submissions: user.submissions || [], // Include all submission details
       }));
@@ -59,7 +76,7 @@ export class UserService {
 
   async updateUserProfile(requiredUser: number, profileData: any) {
     const dataSource = await connectDB();
-    const userRepository = dataSource.getRepository(User);
+    const userRepository = dataSource.getRepository(Users);
     console.log(profileData);
 
     try {
@@ -91,6 +108,7 @@ export class UserService {
       user.majoringIn = profileData.majoringIn || user.majoringIn;
       user.studentOrganization =
         profileData.studentOrganization || user.studentOrganization;
+      user.category = profileData.category || user.category;
 
       await userRepository.save(user);
 

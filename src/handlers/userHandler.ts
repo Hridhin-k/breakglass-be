@@ -24,7 +24,13 @@ export const getUserHandler = async (
       ? Number(event.queryStringParameters.userId)
       : undefined; // Convert to number if present, else pass undefined
     // Delegate the business logic to the controller
-    const response = await userController.getUserData(requestedUserId);
+    const pendingUsers = event.queryStringParameters?.status
+      ? event.queryStringParameters.status
+      : undefined;
+    const response = await userController.getUserData(
+      requestedUserId,
+      pendingUsers
+    );
 
     return {
       statusCode: 200,

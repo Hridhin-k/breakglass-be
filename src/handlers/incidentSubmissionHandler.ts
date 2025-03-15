@@ -22,7 +22,13 @@ export const submitIncidentHandler = async (
   }
   try {
     const { userId, answers } = JSON.parse(event.body || "{}");
-    await incidentSubmissionController.submitIncident(userId, answers);
+    const result: any = await incidentSubmissionController.submitIncident(
+      userId,
+      answers
+    );
+    console.log("result:", result);
+
+    console.log(result.presignedUrls, result.submission);
     return {
       statusCode: httpConstants.HTTP_STATUS_OK, //import http constance
       headers: {
@@ -31,7 +37,11 @@ export const submitIncidentHandler = async (
         "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type,Authorization",
       },
-      body: JSON.stringify({ message: "Incident submitted successfully" }),
+      body: JSON.stringify({
+        message: "Incident submitted successfully with presigned url",
+        submissionId: result.body.submission?.id,
+        presignedUrls: result.body.presignedUrls,
+      }),
     };
   } catch (error: any) {
     return {

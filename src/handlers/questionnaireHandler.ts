@@ -48,6 +48,7 @@ export const addQuestionsHandler = async (
 export const getQuestionsHandler = async (
   event: APIGatewayProxyEvent
 ): Promise<APIGatewayProxyResult> => {
+  const requestedUserId = event.queryStringParameters?.userId;
   try {
     const userId = authenticateToken(event);
 
@@ -59,7 +60,7 @@ export const getQuestionsHandler = async (
     }
 
     // Delegate the business logic to the controller
-    const response = await questionController.getQuestions();
+    const response = await questionController.getQuestions(requestedUserId);
 
     return {
       statusCode: 200,
@@ -75,7 +76,13 @@ export const getQuestionsHandler = async (
     console.error("Get Questions error:", error);
     return {
       statusCode: 500,
-      body: JSON.stringify({ message: "Internal Server Error" }),
+      body: JSON.stringify({
+        message: "Internal Server Error",
+        error:
+          error instanceof Error
+            ? { message: error.message, stack: error.stack }
+            : error, // Fallback for non-Error objects
+      }),
     };
   }
 };

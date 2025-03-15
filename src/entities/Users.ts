@@ -8,21 +8,37 @@ import {
 } from "typeorm";
 import { IncidentSubmission } from "./IncidentSubmission";
 
-@Entity()
-export class User {
+@Entity({ name: "users" })
+export class Users {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Column({ type: "varchar", length: 100, unique: true })
+  @Column({ type: "varchar", length: 100, nullable: true })
   username!: string;
 
   @Column({ type: "varchar", length: 255, unique: true })
   email!: string;
 
-  @Column({ type: "varchar", length: 255 })
-  password!: string;
+  @Column({
+    type: "enum",
+    enum: ["pending", "approved", "rejected", "registered", "blocked"],
+    default: "pending",
+  })
+  status!: "pending" | "approved" | "rejected" | "registered" | "blocked";
 
-  @Column({ type: "varchar", length: 500, nullable: true })
+  @Column({ nullable: true, type: "varchar", length: 255 })
+  otp!: string;
+
+  @Column({ type: "bigint", nullable: true })
+  otpExpiresAt!: number;
+
+  @Column({ nullable: true, type: "varchar", length: 255 })
+  password?: string;
+
+  @Column({ type: "timestamp", nullable: true })
+  lastLogin?: Date; // Stores last login timestamp
+
+  @Column({ nullable: true, type: "varchar", length: 500 })
   refreshToken!: string;
 
   @Column({ type: "varchar", length: 255, nullable: true })
@@ -57,6 +73,9 @@ export class User {
 
   @Column({ type: "varchar", length: 255, nullable: true })
   studentOrganization!: string | null;
+
+  @Column({ type: "varchar", length: 255, nullable: true })
+  category!: string | null;
 
   @OneToMany(() => IncidentSubmission, (submission) => submission.user)
   submissions!: IncidentSubmission[];
