@@ -1,6 +1,5 @@
 import "reflect-metadata";
 import { APIGatewayEvent, Context } from "aws-lambda";
-import { AuthController } from "../controllers/authController";
 import { AuthService } from "../services/authService";
 
 const authService = new AuthService();

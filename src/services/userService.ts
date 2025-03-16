@@ -1,8 +1,52 @@
 import { In } from "typeorm";
 import { Users } from "../entities/Users";
 import { connectDB } from "../utils/database";
+import AWS from "aws-sdk";
+import dotenv from "dotenv";
+import { v4 as uuidv4 } from "uuid";
 
+dotenv.config();
+const s3 = new AWS.S3({
+  region: process.env.UPLOAD_REGION,
+  credentials: {
+    accessKeyId: process.env.UPLOAD_KEY_ID || "",
+    secretAccessKey: process.env.UPLOAD_ACCESS_KEY || "",
+  }, // Ensure this matches the bucket region
+});
 export class UserService {
+  async uploadFileToS3(
+    fileBuffer: Buffer,
+    fileName: string,
+    contentType: string
+  ): Promise<string> {
+    const bucketName = process.env.UPLOAD_BUCKET_NAME;
+
+    if (!bucketName) {
+      throw new Error(
+        "UPLOAD_BUCKET_NAME is not defined in environment variables."
+      );
+    }
+
+    const key = `${uuidv4()}-${fileName}`;
+    const uploadParams = {
+      Bucket: bucketName,
+      Key: key,
+      Body: fileBuffer,
+      ContentType: contentType,
+    };
+
+    try {
+      console.log(`Uploading file to S3: ${bucketName}/${key}`);
+      const result = await s3.upload(uploadParams).promise();
+      console.log(`File uploaded successfully`, result);
+      return result.Location;
+    } catch (error: any) {
+      console.error("S3 Upload Error:", error); // Log detailed error
+      throw new Error(`Failed to upload file to S3: ${error.message}`);
+    }
+  }
+
+  // get user profile
   async getUserData(requestedUserId?: number, pendingUsers?: string) {
     console.log(requestedUserId, pendingUsers);
 
@@ -35,6 +79,7 @@ export class UserService {
         username: user.username,
         email: user.email,
         status: user.status,
+        profileImage: user.profileImage,
         lastLogin: user.lastLogin,
         firstName: user.firstName,
         lastName: user.lastName,
@@ -74,11 +119,13 @@ export class UserService {
     }
   }
 
+  // update user profile
   async updateUserProfile(requiredUser: number, profileData: any) {
     const dataSource = await connectDB();
     const userRepository = dataSource.getRepository(Users);
     console.log(profileData);
-
+    const queryRunner = dataSource.createQueryRunner();
+    await queryRunner.startTransaction();
     try {
       const user = await userRepository.findOne({
         where: { id: requiredUser },
@@ -109,8 +156,17 @@ export class UserService {
       user.studentOrganization =
         profileData.studentOrganization || user.studentOrganization;
       user.category = profileData.category || user.category;
-
-      await userRepository.save(user);
+      if (profileData.profileImage?.file) {
+        const fileBuffer = Buffer.from(profileData.profileImage.file, "base64");
+        const imageUrl = await this.uploadFileToS3(
+          fileBuffer,
+          profileData.profileImage.fileName,
+          profileData.profileImage.contentType
+        );
+        user.profileImage = imageUrl || user.profileImage;
+      }
+      await queryRunner.manager.save(user);
+      await queryRunner.commitTransaction();
 
       return {
         statusCode: 200,
@@ -124,11 +180,11 @@ export class UserService {
       console.error("Error in UserService (updateUserProfile):", error);
       return {
         statusCode: 500,
-        body: JSON.stringify({
+        body: {
           success: false,
           message: "An error occurred while updating profile.",
           error: error.message,
-        }),
+        },
       };
     } finally {
       await dataSource.destroy();

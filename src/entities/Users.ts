@@ -19,6 +19,9 @@ export class Users {
   @Column({ type: "varchar", length: 255, unique: true })
   email!: string;
 
+  @Column({ type: "text", nullable: true })
+  profileImage!: string;
+
   @Column({
     type: "enum",
     enum: ["pending", "approved", "rejected", "registered", "blocked"],

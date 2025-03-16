@@ -20,33 +20,6 @@ provider:
 plugins:
   - serverless-offline
 functions:
-  registerUser:
-    handler: src/handlers/authHandler.registerUser
-    events:
-      - http:
-          path: register
-          method: post
-          cors:
-            origins:
-              - "*"
-  loginUser:
-    handler: src/handlers/authHandler.loginUser
-    events:
-      - http:
-          path: login
-          method: post
-          cors:
-            origins:
-              - "*"
-  RefreshToken:
-    handler: src/handlers/authHandler.refreshToken
-    events:
-      - http:
-          path: refresh
-          method: post
-          cors:
-            origins:
-              - "*"
   CreateQuestionnaire:
     handler: src/handlers/questionnaireHandler.addQuestionsHandler
     events:
@@ -128,29 +101,12 @@ functions:
           cors:
             origins:
               - "*"
-  UploadMedia:
-    handler: src/handlers/uploadHandler.uploadMediaHandler
-    events:
-      - http:
-          path: media/upload
-          method: post
-          cors:
-            origins:
-              - "*"
+
   authenticate:
     handler: src/handlers/authHandler.handleAuth
     events:
       - http:
           path: authenticate
-          method: post
-          cors:
-            origins:
-              - "*"
-  mail:
-    handler: src/handlers/emailHandler.handler
-    events:
-      - http:
-          path: mail
           method: post
           cors:
             origins:

@@ -42,14 +42,7 @@ export class QuestionController {
     try {
       const result = await this.questionService.addQuestions(questions);
       return {
-        statusCode: 201,
-        headers: {
-          "Access-Control-Allow-Origin": "*", // or "*" if you prefer
-          "Access-Control-Allow-Credentials": true,
-          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type,Authorization",
-        },
-        body: JSON.stringify(result),
+        body: result,
       };
     } catch (error) {
       console.error("Error in QuestionController (addQuestions):", error);
@@ -61,13 +54,6 @@ export class QuestionController {
     try {
       const result = await this.questionService.getQuestions(requestedUserId);
       return {
-        statusCode: 200,
-        headers: {
-          "Access-Control-Allow-Origin": "*", // or "*" if you prefer
-          "Access-Control-Allow-Credentials": true,
-          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type,Authorization",
-        },
         body: JSON.stringify(result),
       };
     } catch (error) {
@@ -98,13 +84,6 @@ export class QuestionController {
     try {
       const result = await this.questionService.updateQuestions(questions);
       return {
-        statusCode: 200,
-        headers: {
-          "Access-Control-Allow-Origin": "*", // or "*" if you prefer
-          "Access-Control-Allow-Credentials": true,
-          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type,Authorization",
-        },
         body: JSON.stringify(result),
       };
     } catch (error) {

@@ -14,13 +14,6 @@ export class UserController {
         pendingUsers
       );
       return {
-        statusCode: 200,
-        headers: {
-          "Access-Control-Allow-Origin": "*", // or "*" if you prefer
-          "Access-Control-Allow-Credentials": true,
-          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type,Authorization",
-        },
         body: JSON.stringify(result),
       };
     } catch (error) {
@@ -36,13 +29,6 @@ export class UserController {
         profileData
       );
       return {
-        statusCode: 200,
-        headers: {
-          "Access-Control-Allow-Origin": "*", // or "*" if you prefer
-          "Access-Control-Allow-Credentials": true,
-          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type,Authorization",
-        },
         body: JSON.stringify(result),
       };
     } catch (error) {

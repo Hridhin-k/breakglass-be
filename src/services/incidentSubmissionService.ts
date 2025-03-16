@@ -688,13 +688,26 @@ export class IncidentSubmissionService {
   async updateIncident(
     userId: number | any,
     incidentSubmissionId: number,
-    newAnswers: { questionId: number; answer: string | string[] | Date }[]
+    newAnswers: {
+      questionId: number;
+      answer:
+        | string
+        | string[]
+        | Date
+        | {
+            fileName: string;
+            file: string;
+            contentType: string;
+            description?: string;
+          }[];
+    }[]
   ) {
     const dataSource = await connectDB();
     const answerRepository = dataSource.getRepository(IncidentAnswer);
     const questionRepository = dataSource.getRepository(IncidentQuestion);
     const incidentSubmissionRepository =
       dataSource.getRepository(IncidentSubmission);
+    const mediaRepository = dataSource.getRepository(IncidentMedia);
 
     try {
       const submission = await incidentSubmissionRepository.findOne({
@@ -708,16 +721,13 @@ export class IncidentSubmissionService {
       for (const { questionId, answer: newAnswer } of newAnswers) {
         const existingAnswer = await answerRepository.findOne({
           where: {
-            incidentSubmission: Equal(submission.id), // Use submission.id
+            incidentSubmission: submission,
             question: { id: questionId },
           },
           order: { version: "DESC" },
         });
 
-        let newVersion = 1; // Default to 1 if no existing answer
-        if (existingAnswer) {
-          newVersion = existingAnswer.version + 1;
-        }
+        let newVersion = existingAnswer ? existingAnswer.version + 1 : 1;
 
         const question = await questionRepository.findOne({
           where: { id: questionId },
@@ -727,61 +737,123 @@ export class IncidentSubmissionService {
           throw new Error(`Question with ID ${questionId} not found.`);
         }
 
-        const newAnswerEntity = answerRepository.create({
-          incidentSubmission: submission,
-          question,
-          type: question.questionType,
-          version: newVersion,
-        });
+        if (question.questionType === "file" && Array.isArray(newAnswer)) {
+          // ✅ Handle file uploads to AWS S3
+          await Promise.all(
+            newAnswer.map(async (fileData) => {
+              if (
+                typeof fileData === "object" &&
+                "fileName" in fileData &&
+                "file" in fileData &&
+                "contentType" in fileData
+              ) {
+                const fileBuffer = Buffer.from(fileData.file, "base64");
 
-        switch (question.questionType) {
-          case "single_choice":
-            newAnswerEntity.singleChoiceAnswer = newAnswer as string;
-            break;
-          case "multiple_choice":
-            newAnswerEntity.multipleChoiceAnswer = Array.isArray(newAnswer)
-              ? newAnswer
-              : [newAnswer as string];
-            break;
-          case "date":
-            newAnswerEntity.dateAnswer = new Date(newAnswer as string);
-            break;
-          case "plain_text":
-            newAnswerEntity.textAnswer = newAnswer as string;
-            break;
-          case "map":
-            if (typeof newAnswer === "string") {
-              try {
-                newAnswerEntity.mapAnswer = JSON.parse(newAnswer);
-              } catch (error) {
+                // 🔥 Upload file to AWS S3
+                const fileUrl = await this.uploadFileToS3(
+                  fileBuffer,
+                  fileData.fileName,
+                  fileData.contentType
+                );
+
+                const existingMedia = await mediaRepository.findOne({
+                  where: {
+                    incidentSubmission: submission,
+                    question: { id: questionId },
+                  },
+                  order: { version: "DESC" },
+                });
+
+                let newMediaVersion = existingMedia
+                  ? existingMedia.version + 1
+                  : 1;
+
+                const media = mediaRepository.create({
+                  incidentSubmission: submission,
+                  question,
+                  url: fileUrl,
+                  mimeType: fileData.contentType,
+                  version: newMediaVersion,
+                  description: fileData.description,
+                });
+
+                await mediaRepository.save(media);
+              }
+            })
+          );
+        } else {
+          // ✅ Create new answer entity for non-file answers
+          const newAnswerEntity = answerRepository.create({
+            incidentSubmission: submission,
+            question,
+            type: question.questionType,
+            version: newVersion,
+          });
+
+          switch (question.questionType) {
+            case "single_choice":
+              newAnswerEntity.singleChoiceAnswer = newAnswer as string;
+              break;
+
+            case "multiple_choice":
+              if (
+                Array.isArray(newAnswer) &&
+                typeof newAnswer[0] === "string"
+              ) {
+                newAnswerEntity.multipleChoiceAnswer = newAnswer as string[];
+              } else {
+                throw new Error(
+                  `Invalid data format for multiple choice answer`
+                );
+              }
+              break;
+
+            case "date":
+              newAnswerEntity.dateAnswer = new Date(newAnswer as string);
+              break;
+
+            case "plain_text":
+              newAnswerEntity.textAnswer = newAnswer as string;
+              break;
+
+            case "map":
+              if (typeof newAnswer === "string") {
+                try {
+                  newAnswerEntity.mapAnswer = JSON.parse(newAnswer);
+                } catch (error) {
+                  throw new Error(
+                    `Invalid map data format for question ${questionId}`
+                  );
+                }
+              } else if (
+                typeof newAnswer === "object" &&
+                "name" in newAnswer &&
+                "latitude" in newAnswer &&
+                "longitude" in newAnswer
+              ) {
+                newAnswerEntity.mapAnswer = newAnswer as {
+                  name: string;
+                  latitude: number;
+                  longitude: number;
+                };
+              } else {
                 throw new Error(
                   `Invalid map data format for question ${questionId}`
                 );
               }
-            } else if (
-              typeof newAnswer === "object" &&
-              "name" in newAnswer &&
-              "latitude" in newAnswer &&
-              "longitude" in newAnswer
-            ) {
-              newAnswerEntity.mapAnswer = newAnswer as {
-                name: string;
-                latitude: number;
-                longitude: number;
-              };
-            } else {
-              throw new Error(
-                `Invalid map data format for question ${questionId}`
-              );
-            }
-            break;
-          default:
-            throw new Error(`Invalid question type: ${question.questionType}`);
-        }
+              break;
 
-        await answerRepository.save(newAnswerEntity);
+            default:
+              throw new Error(
+                `Invalid question type: ${question.questionType}`
+              );
+          }
+
+          await answerRepository.save(newAnswerEntity);
+        }
       }
 
+      // ✅ Increment submission version after saving answers
       submission.version = submission.version + 1;
       await incidentSubmissionRepository.save(submission);
 

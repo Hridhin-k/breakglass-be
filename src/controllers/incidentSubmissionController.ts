@@ -12,13 +12,6 @@ export class IncidentSubmissionController {
   async submitIncident(userId: number, answers: any) {
     const result = await this.incidentService.submitIncident(userId, answers);
     return {
-      statusCode: 201,
-      headers: {
-        "Access-Control-Allow-Origin": "*", // or "*" if you prefer
-        "Access-Control-Allow-Credentials": true,
-        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type,Authorization",
-      },
       body: result,
     };
   }
@@ -36,14 +29,7 @@ export class IncidentSubmissionController {
       newAnswers
     );
     return {
-      statusCode: 201,
-      headers: {
-        "Access-Control-Allow-Origin": "*", // or "*" if you prefer
-        "Access-Control-Allow-Credentials": true,
-        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type,Authorization",
-      },
-      body: JSON.stringify(result),
+      body: result,
     };
   }
   /** Get perticular incident of a user **/

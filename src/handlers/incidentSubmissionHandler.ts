@@ -38,7 +38,7 @@ export const submitIncidentHandler = async (
         "Access-Control-Allow-Headers": "Content-Type,Authorization",
       },
       body: JSON.stringify({
-        message: "Incident submitted successfully with presigned url",
+        message: "Incident submitted successfully",
         submissionId: result.body.submission?.id,
         presignedUrls: result.body.presignedUrls,
       }),
