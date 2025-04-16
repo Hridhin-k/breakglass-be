@@ -49,9 +49,7 @@ export class IncidentSubmissionService {
     };
 
     try {
-      console.log(`Uploading file to S3: ${bucketName}/${key}`);
       const result = await s3.upload(uploadParams).promise();
-      console.log(`File uploaded successfully`, result);
       return result.Location;
     } catch (error: any) {
       console.error("S3 Upload Error:", error); // Log detailed error

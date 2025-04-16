@@ -111,3 +111,12 @@ functions:
           cors:
             origins:
               - "*"
+  notification:
+    handler: src/handlers/notificationHandler.handleNotificationWithMiddleware
+    events:
+      - http:
+          path: notifications
+          method: post
+          cors:
+            origins:
+              - "*"

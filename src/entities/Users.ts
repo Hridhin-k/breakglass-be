@@ -78,7 +78,13 @@ export class Users {
   studentOrganization!: string | null;
 
   @Column({ type: "varchar", length: 255, nullable: true })
+  role!: string | null;
+
+  @Column({ type: "varchar", length: 255, nullable: true })
   category!: string | null;
+
+  @Column({ nullable: true, type: "varchar", length: 500 })
+  notificationToken!: string;
 
   @OneToMany(() => IncidentSubmission, (submission) => submission.user)
   submissions!: IncidentSubmission[];

@@ -142,8 +142,6 @@ export class QuestionService {
       options?: { id?: number; optionText?: string }[];
     }[]
   ) {
-    console.log(questions, "QUESTIONS");
-
     const dataSource = await connectDB();
     const questionRepository = dataSource.getRepository(IncidentQuestion);
     const optionRepository = dataSource.getRepository(IncidentQuestionOption);

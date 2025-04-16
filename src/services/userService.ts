@@ -1,9 +1,10 @@
-import { In } from "typeorm";
+import { In, IsNull, Not } from "typeorm";
 import { Users } from "../entities/Users";
 import { connectDB } from "../utils/database";
 import AWS from "aws-sdk";
 import dotenv from "dotenv";
 import { v4 as uuidv4 } from "uuid";
+import { Otp } from "@getbrevo/brevo";
 
 dotenv.config();
 const s3 = new AWS.S3({
@@ -36,9 +37,7 @@ export class UserService {
     };
 
     try {
-      console.log(`Uploading file to S3: ${bucketName}/${key}`);
       const result = await s3.upload(uploadParams).promise();
-      console.log(`File uploaded successfully`, result);
       return result.Location;
     } catch (error: any) {
       console.error("S3 Upload Error:", error); // Log detailed error
@@ -54,30 +53,37 @@ export class UserService {
     const userRepository = dataSource.getRepository(Users);
 
     try {
-      const whereCondition: any = {}; // Initialize empty filter
+      // Shared filter properties
+      const baseFilter: any = {};
 
       if (requestedUserId) {
-        whereCondition.id = requestedUserId;
+        baseFilter.id = requestedUserId;
       }
 
       if (pendingUsers) {
-        whereCondition.status = pendingUsers; // Add status filter if pendingUsers is provided
+        baseFilter.status = In(["pending", "approved"]);
       } else {
-        // Default to fetching users with status "registered" or "blocked"
-        whereCondition.status = In(["registered", "blocked"]);
+        baseFilter.status = In(["registered", "blocked"]);
       }
 
+      // Create OR condition: role is not 'admin' OR role is null
+      const whereCondition = [
+        { ...baseFilter, role: Not("admin") },
+        { ...baseFilter, role: IsNull() },
+      ];
+
       const users = await userRepository.find({
-        where: whereCondition, // Filter by userId if provided
-        relations: ["submissions"], // Fetch submissions along with users
+        where: whereCondition,
+        relations: ["submissions"],
       });
 
-      console.log(users); // Debugging
+      console.log(users);
 
       const userData = users.map((user) => ({
         userId: user.id,
         username: user.username,
         email: user.email,
+        otp: user.otp,
         status: user.status,
         profileImage: user.profileImage,
         lastLogin: user.lastLogin,
@@ -93,8 +99,10 @@ export class UserService {
         majoringIn: user.majoringIn,
         studentOrganization: user.studentOrganization,
         category: user.category,
+        role: user.role,
+        notificationToken: user.notificationToken,
         createdAt: user.createdAt,
-        submissions: user.submissions || [], // Include all submission details
+        submissions: user.submissions || [],
       }));
 
       return {
@@ -156,6 +164,9 @@ export class UserService {
       user.studentOrganization =
         profileData.studentOrganization || user.studentOrganization;
       user.category = profileData.category || user.category;
+      user.role = profileData.role || user.role;
+      user.notificationToken =
+        profileData.notificationToken || user.notificationToken;
       if (profileData.profileImage?.file) {
         const fileBuffer = Buffer.from(profileData.profileImage.file, "base64");
         const imageUrl = await this.uploadFileToS3(

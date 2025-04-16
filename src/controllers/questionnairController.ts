@@ -15,8 +15,6 @@ export class QuestionController {
     order: number;
     required: boolean;
   }) {
-    console.log(questions, "QUESTIONS");
-
     if (!Array.isArray(questions) || questions.length === 0) {
       throw new Error("Questions must be a non-empty array");
     }
@@ -75,8 +73,6 @@ export class QuestionController {
       options?: { id?: number; optionText?: string }[];
     }[]
   ) {
-    console.log(questions, "QUESTIONS");
-
     if (!Array.isArray(questions) || questions.length === 0) {
       throw new Error("Questions must be a non-empty array");
     }
